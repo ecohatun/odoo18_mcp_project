@@ -28,7 +28,7 @@ dependencies = [
     "uvicorn>=0.22.0",
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
-    "mcp>=0.1.0",  # Aligned with requirements.txt
+    "mcp>=1.7.0",  # Updated to fix MCPClient import error
     "sqlparse>=0.4.4",
     
     # Database dependencies
