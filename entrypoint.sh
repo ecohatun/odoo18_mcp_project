@@ -4,10 +4,9 @@
 mkdir -p /app/logs /app/data /app/exports /app/tmp /app/generated_modules
 chown -R mcp:mcp /app/logs /app/data /app/exports /app/tmp /app/generated_modules
 
-# Switch to non-root user
-exec su -s /bin/sh mcp -c "if [ \"\$1\" = \"standalone\" ]; then
-    exec python standalone_mcp_server.py
-elif [ \"\$1\" = \"test\" ]; then
+# Switch to non-root user and execute
+exec su -s /bin/sh mcp -c "
+if [ \"\$1\" = \"test\" ]; then
     if [ \"\$2\" = \"mcp\" ]; then
         exec python tests/test_mcp_server_consolidated.py --all
     elif [ \"\$2\" = \"agent\" ]; then
@@ -26,6 +25,10 @@ elif [ \"\$1\" = \"test\" ]; then
         echo \"Available test types: mcp, agent, utils, export-import, all\"
         exit 1
     fi
+elif [ \"\$1\" = \"main\" ]; then
+    exec python main.py \${@:2}
 else
-    exec python main.py \$@
-fi"
+    # Por defecto ejecutar standalone_mcp_server.py
+    exec python standalone_mcp_server.py
+fi
+"
