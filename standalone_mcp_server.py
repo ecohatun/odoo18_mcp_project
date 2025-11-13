@@ -3,6 +3,7 @@
 
 """
 Standalone MCP server for testing MCP tools.
+This version implements tools directly without depending on mcp_server.py
 """
 
 import os
@@ -10,8 +11,6 @@ import sys
 import json
 import logging
 import asyncio
-import importlib.util
-import xmlrpc.client # Added xmlrpc.client import
 from typing import Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
@@ -23,7 +22,6 @@ import uvicorn
 
 # Load environment variables
 load_dotenv()
-
 
 # Set up logging
 logging.basicConfig(
@@ -46,160 +44,230 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Load the MCP server module
-def load_mcp_server():
-    """Load the MCP server module."""
-    try:
-        # Get the path to the MCP server module
-        mcp_server_path = os.path.join(os.path.dirname(__file__), "mcp_server.py")
-
-        # Load the module
-        spec = importlib.util.spec_from_file_location("mcp_server", mcp_server_path)
-        mcp_server = importlib.util.module_from_spec(spec)
-        if spec and spec.loader:
-            spec.loader.exec_module(mcp_server)
-        else:
-            logger.error("Failed to load MCP server module spec")
-            return None
-
-        # Get the MCP server instance
-        mcp = getattr(mcp_server, "mcp", None)
-
-        if not mcp:
-            logger.error("Failed to get MCP server instance")
-            return None
-
-        return mcp
-    except Exception as e:
-        logger.error(f"Failed to load MCP server module: {str(e)}")
-        return None
-
-
-# Get the MCP server instance
-mcp = load_mcp_server()
-
-if not mcp:
-    logger.error("Failed to load MCP server. Exiting...")
-    sys.exit(1)
-
-# Get the tools from the MCP server
-tools = {}
+# Import Odoo client and tools
 try:
-    # Import all necessary tools in a single block
-    from mcp_server import (
-        retrieve_odoo_documentation,
-        advanced_search,
-        search_records,
-        create_record,
-        update_record,
-        delete_record,
-        execute_method,
-        export_records_to_csv,
-        import_records_from_csv,
-        export_related_records_to_csv,
-        import_related_records_from_csv,
-        validate_field_value,
-        analyze_field_importance,
-        get_field_groups,
-        get_record_template,
-        generate_npx,
-        query_deepwiki,
-        improved_generate_odoo_module,
-    )
-
-    # Register all imported tools
-    tools["retrieve_odoo_documentation"] = retrieve_odoo_documentation
-    tools["advanced_search"] = advanced_search
-    tools["search_records"] = search_records
-    tools["create_record"] = create_record
-    tools["update_record"] = update_record
-    tools["delete_record"] = delete_record
-    tools["execute_method"] = execute_method
-    tools["export_records_to_csv"] = export_records_to_csv
-    tools["import_records_from_csv"] = import_records_from_csv
-    tools["export_related_records_to_csv"] = export_related_records_to_csv
-    tools["import_related_records_from_csv"] = import_related_records_from_csv
-    tools["validate_field_value"] = validate_field_value
-    tools["analyze_field_importance"] = analyze_field_importance
-    tools["get_field_groups"] = get_field_groups
-    tools["get_record_template"] = get_record_template
-    tools["generate_npx"] = generate_npx
-    tools["query_deepwiki"] = query_deepwiki
-    tools["improved_generate_odoo_module"] = improved_generate_odoo_module
-
-    logger.info(f"Successfully imported and registered {len(tools)} tools from mcp_server")
-
+    from src.odoo.client import OdooClient
+    logger.info("Successfully imported OdooClient")
+    
+    def get_odoo_client():
+        return OdooClient(
+            url=os.getenv("ODOO_URL", "http://localhost:8069"),
+            db=os.getenv("ODOO_DB", "odoo"),
+            username=os.getenv("ODOO_USERNAME", "admin"),
+            password=os.getenv("ODOO_PASSWORD", "admin")
+        )
+    
 except Exception as e:
-    logger.error(f"Error importing tools from mcp_server: {str(e)}")
-    # Create placeholder functions for all expected tools to avoid KeyError later
-    expected_tools = [
-        "retrieve_odoo_documentation", "advanced_search", "search_records",
-        "create_record", "update_record", "delete_record", "execute_method",
-        "export_records_to_csv", "import_records_from_csv", "export_related_records_to_csv",
-        "import_related_records_from_csv", "validate_field_value", "analyze_field_importance",
-        "get_field_groups", "get_record_template", "generate_npx", "query_deepwiki",
-        "improved_generate_odoo_module"
-    ]
-    for tool_name in expected_tools:
-        tools[tool_name] = lambda **kwargs: {"success": False, "error": f"Tool '{tool_name}' not available due to import error: {str(e)}"}
-    logger.warning(f"Placeholder functions created for {len(expected_tools)} tools due to import error.")
+    logger.error(f"Failed to import OdooClient: {e}")
+    get_odoo_client = None
 
+# Import advanced search
+try:
+    from advanced_search import AdvancedSearch
+    from src.odoo.dynamic.model_discovery import ModelDiscovery
+    
+    def get_advanced_search():
+        client = get_odoo_client()
+        model_discovery = ModelDiscovery(
+            url=os.getenv("ODOO_URL"),
+            db=os.getenv("ODOO_DB"),
+            username=os.getenv("ODOO_USERNAME"),
+            password=os.getenv("ODOO_PASSWORD")
+        )
+        return AdvancedSearch(model_discovery)
+    
+    logger.info("Successfully imported AdvancedSearch")
+    advanced_search_available = True
+except Exception as e:
+    logger.warning(f"AdvancedSearch not available: {e}")
+    advanced_search_available = False
 
-logger.info(f"Loaded {len(tools)} tools from MCP server: {', '.join(tools.keys())}")
+# Tool implementations
+def search_records(model: str, domain: list = None, fields: list = None, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+    """Search records in Odoo"""
+    try:
+        client = get_odoo_client()
+        records = client.search_read(model, domain or [], fields or [], limit, offset)
+        return {
+            "success": True,
+            "model": model,
+            "count": len(records),
+            "records": records
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def create_record(model: str, values: dict) -> Dict[str, Any]:
+    """Create a new record in Odoo"""
+    try:
+        client = get_odoo_client()
+        record_id = client.create(model, values)
+        return {
+            "success": True,
+            "model": model,
+            "id": record_id,
+            "message": f"Record created successfully with ID {record_id}"
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def update_record(model: str, id: int, values: dict) -> Dict[str, Any]:
+    """Update an existing record in Odoo"""
+    try:
+        client = get_odoo_client()
+        success = client.write(model, [id], values)
+        return {
+            "success": success,
+            "model": model,
+            "id": id,
+            "message": f"Record {id} updated successfully" if success else "Update failed"
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def delete_record(model: str, id: int) -> Dict[str, Any]:
+    """Delete a record from Odoo"""
+    try:
+        client = get_odoo_client()
+        success = client.unlink(model, [id])
+        return {
+            "success": success,
+            "model": model,
+            "id": id,
+            "message": f"Record {id} deleted successfully" if success else "Delete failed"
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def execute_method(model: str, method: str, args: list = None, kwargs: dict = None) -> Dict[str, Any]:
+    """Execute a custom method on an Odoo model"""
+    try:
+        client = get_odoo_client()
+        result = client.execute(model, method, args or [], kwargs or {})
+        return {
+            "success": True,
+            "model": model,
+            "method": method,
+            "result": result
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def get_model_fields(model: str) -> Dict[str, Any]:
+    """Get field definitions for an Odoo model"""
+    try:
+        client = get_odoo_client()
+        fields = client.execute(model, 'fields_get', [], {})
+        return {
+            "success": True,
+            "model": model,
+            "fields": fields
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def search_count(model: str, domain: list = None) -> Dict[str, Any]:
+    """Count records matching a domain"""
+    try:
+        client = get_odoo_client()
+        count = client.execute(model, 'search_count', [domain or []], {})
+        return {
+            "success": True,
+            "model": model,
+            "count": count
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def advanced_search(query: str, limit: int = 100) -> str:
+    """Perform advanced natural language search"""
+    if not advanced_search_available:
+        return "Advanced search is not available"
+    try:
+        search = get_advanced_search()
+        result = search.execute_query(query, limit)
+        return result
+    except Exception as e:
+        return f"Error in advanced search: {str(e)}"
+
+def get_record_template(model: str) -> Dict[str, Any]:
+    """Get a template for creating a new record"""
+    try:
+        client = get_odoo_client()
+        fields = client.execute(model, 'fields_get', [], {})
+        template = {}
+        for field_name, field_info in fields.items():
+            if field_info.get('required'):
+                template[field_name] = None
+        return {
+            "success": True,
+            "model": model,
+            "template": template
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# Tool registry
+TOOL_FUNCTIONS = {
+    "search_records": search_records,
+    "create_record": create_record,
+    "update_record": update_record,
+    "delete_record": delete_record,
+    "execute_method": execute_method,
+    "get_model_fields": get_model_fields,
+    "search_count": search_count,
+    "advanced_search": advanced_search,
+    "get_record_template": get_record_template,
+}
+
+logger.info(f"Successfully loaded {len(TOOL_FUNCTIONS)} tools")
 
 
 @app.post("/call_tool")
 async def call_tool(request: Request):
     """Call an MCP tool."""
     try:
-        # Parse the request body
         body = await request.json()
-
-        # Get the tool name and parameters
-        # Accept both "tool" and "tool_name" for compatibility
-        tool_name = body.get("tool") or body.get("tool_name")
-        params = body.get("params", {})
-
+        
+        tool_name = body.get("tool") or body.get("name")
         if not tool_name:
             raise HTTPException(status_code=400, detail="Tool name is required")
-
-        if tool_name not in tools:
-            raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
-
-        # Call the tool
-        logger.info(f"Calling tool '{tool_name}' with parameters: {params}")
         
-        # Check if the tool is an async function and await it if necessary
-        result = tools[tool_name](**params)
+        arguments = body.get("params") or body.get("arguments") or {}
         
-        # Check if the result is a coroutine (async function) and await it
-        if asyncio.iscoroutine(result):
-            logger.info(f"Tool '{tool_name}' is async, awaiting result")
-            result = await result
+        if tool_name not in TOOL_FUNCTIONS:
+            available = ", ".join(TOOL_FUNCTIONS.keys())
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Tool '{tool_name}' not found. Available: {available}"
+            )
         
-        # Ensure result is properly formatted as a JSON string if it's a dict
-        if isinstance(result, dict):
-            if "result" in result and not isinstance(result["result"], str):
-                try:
-                    # If the result has a nested result dict, ensure it's properly serialized
-                    result["result"] = json.dumps(result["result"], default=str)
-                except (TypeError, ValueError) as e:
-                    logger.warning(f"Failed to serialize result: {str(e)}")
-                    # If serialization fails, create a simple error response
-                    result = {
-                        "success": False,
-                        "error": f"Failed to serialize result: {str(e)}",
-                        "result": "{}"
-                    }
+        tool_function = TOOL_FUNCTIONS[tool_name]
         
-        # Return the result
-        return {"success": True, "result": result}
-
+        logger.info(f"Calling tool '{tool_name}' with arguments: {arguments}")
+        
+        import inspect
+        if inspect.iscoroutinefunction(tool_function):
+            result = await tool_function(**arguments)
+        else:
+            result = tool_function(**arguments)
+        
+        return {
+            "success": True,
+            "tool": tool_name,
+            "result": result
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error calling tool: {str(e)}")
+        logger.error(f"Error calling tool: {str(e)}", exc_info=True)
         return JSONResponse(
-            status_code=500, content={"success": False, "error": str(e)}
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e)
+            }
         )
 
 
@@ -207,8 +275,11 @@ async def call_tool(request: Request):
 async def list_tools():
     """List all available tools."""
     tool_info = {}
-    for tool_name, tool_func in tools.items():
-        tool_info[tool_name] = {"description": tool_func.__doc__, "parameters": {}}
+    for tool_name, tool_func in TOOL_FUNCTIONS.items():
+        tool_info[tool_name] = {
+            "description": tool_func.__doc__ or f"Execute {tool_name}",
+            "parameters": {}
+        }
 
     return {"success": True, "tools": tool_info}
 
@@ -216,13 +287,17 @@ async def list_tools():
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "tools_loaded": len(TOOL_FUNCTIONS),
+        "tools": list(TOOL_FUNCTIONS.keys())
+    }
 
 
 if __name__ == "__main__":
-    # Get host and port from environment variables
     host = os.environ.get("MCP_HOST", "0.0.0.0")
-    port = 8001  # Explicitly set to 8001
+    port = 8001
 
     logger.info(f"Starting standalone MCP server at {host}:{port}")
+    logger.info(f"Available tools: {', '.join(TOOL_FUNCTIONS.keys())}")
     uvicorn.run(app, host=host, port=port)
