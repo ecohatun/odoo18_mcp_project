@@ -49,7 +49,7 @@ COPY --from=builder /app/wheels /app/wheels
 RUN pip install --no-cache-dir /app/wheels/*.whl
 
 # Copy the rest of the application
-COPY main.py mcp_server.py standalone_mcp_server.py ./
+COPY main.py mcp_server.py standalone_mcp_server.py advanced_search.py query_parser.py relationship_handler.py ./
 COPY .env.example ./.env.example
 COPY entrypoint.sh /app/entrypoint.sh
 COPY src ./src
