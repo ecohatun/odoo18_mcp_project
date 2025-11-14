@@ -48,15 +48,17 @@ app.add_middleware(
 # Import Odoo client and tools
 try:
     from src.odoo.client import OdooClient
+    from src.odoo.schemas import OdooConfig
     logger.info("Successfully imported OdooClient")
     
     def get_odoo_client():
-        return OdooClient(
+        config = OdooConfig(
             url=os.getenv("ODOO_URL", "http://localhost:8069"),
             db=os.getenv("ODOO_DB", "odoo"),
             username=os.getenv("ODOO_USERNAME", "admin"),
             password=os.getenv("ODOO_PASSWORD", "admin")
         )
+        return OdooClient(config)
     
 except Exception as e:
     logger.error(f"Failed to import OdooClient: {e}")
