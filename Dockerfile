@@ -46,8 +46,7 @@ COPY .env.example ./.env.example
 COPY entrypoint.sh /app/entrypoint.sh
 COPY src ./src
 COPY tests ./tests
-# Create directories for logs, data, and generated modules
-RUN mkdir -p /app/logs /app/data /app/exports /app/tmp /app/generated_modules
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV ODOO_URL=http://localhost:8069
@@ -57,9 +56,16 @@ ENV ODOO_PASSWORD=admin
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app
 ENV GIT_PYTHON_REFRESH=quiet
+
 # Create a non-root user to run the application
 RUN groupadd -r mcp && useradd -r -g mcp mcp
-RUN chown -R mcp:mcp /app /app/logs /app/data /app/exports /app/tmp /app/generated_modules
+
+# Create directories for logs, data, and generated modules
+RUN mkdir -p /app/logs /app/data /app/exports /app/tmp /app/generated_modules
+
+# Change ownership of ALL /app directory and subdirectories
+RUN chown -R mcp:mcp /app
+
 USER mcp
 # Expose the port the app runs on
 EXPOSE 8001
