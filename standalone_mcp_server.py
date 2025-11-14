@@ -373,8 +373,13 @@ def export_records_to_csv(model: str, fields: List[str] = None, domain: List = N
         
         client = get_odoo_client()
         
-        # Get records
-        records = client.search_read(model, domain or [], fields or [], limit=10000, offset=0)
+        # Get records usando SearchParams
+        params = SearchParams(
+            domain=domain or [],
+            limit=10000,
+            offset=0
+        )
+        records = client.search_read(model, params, fields)
         
         if not records:
             return {"success": False, "error": "No records found"}
@@ -410,55 +415,6 @@ def export_records_to_csv(model: str, fields: List[str] = None, domain: List = N
         }
     except Exception as e:
         logger.error(f"Error exporting records: {str(e)}")
-        return {"success": False, "error": str(e)}
-
-def import_records_from_csv(model: str, input_path: str, 
-                            create_if_not_exists: bool = True,
-                            update_if_exists: bool = False) -> Dict[str, Any]:
-    """Import records from CSV to an Odoo model"""
-    try:
-        import csv
-        
-        client = get_odoo_client()
-        
-        if not os.path.exists(input_path):
-            return {"success": False, "error": f"File not found: {input_path}"}
-        
-        created = 0
-        updated = 0
-        errors = 0
-        
-        with open(input_path, 'r', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
-            
-            for row in reader:
-                try:
-                    # Remove empty values
-                    values = {k: v for k, v in row.items() if v}
-                    
-                    # Check if record exists (if id is provided)
-                    record_id = values.pop('id', None)
-                    
-                    if record_id and update_if_exists:
-                        client.write(model, [int(record_id)], values)
-                        updated += 1
-                    elif create_if_not_exists:
-                        client.create(model, values)
-                        created += 1
-                        
-                except Exception as e:
-                    logger.error(f"Error importing record: {str(e)}")
-                    errors += 1
-        
-        return {
-            "success": True,
-            "model": model,
-            "created": created,
-            "updated": updated,
-            "errors": errors
-        }
-    except Exception as e:
-        logger.error(f"Error importing records: {str(e)}")
         return {"success": False, "error": str(e)}
 
 def export_related_records_to_csv(parent_model: str, child_model: str, 
