@@ -115,7 +115,12 @@ def search_records(model: str, domain: list = None, fields: list = None, limit: 
     """Search records in Odoo"""
     try:
         client = get_odoo_client()
-        records = client.search_read(model, domain or [], fields or [], limit, offset)
+        params = SearchParams(
+            domain=domain or [],
+            limit=limit,
+            offset=offset
+        )
+        records = client.search_read(model, params, fields)
         return {
             "success": True,
             "model": model,
@@ -123,13 +128,15 @@ def search_records(model: str, domain: list = None, fields: list = None, limit: 
             "records": records
         }
     except Exception as e:
+        logger.error(f"Error in search_records: {str(e)}")
         return {"success": False, "error": str(e)}
 
 def create_record(model: str, values: dict) -> Dict[str, Any]:
     """Create a new record in Odoo"""
     try:
         client = get_odoo_client()
-        record_id = client.create(model, values)
+        params = CreateParams(values=values)
+        record_id = client.create(model, params)
         return {
             "success": True,
             "model": model,
@@ -137,13 +144,15 @@ def create_record(model: str, values: dict) -> Dict[str, Any]:
             "message": f"Record created successfully with ID {record_id}"
         }
     except Exception as e:
+        logger.error(f"Error in create_record: {str(e)}")
         return {"success": False, "error": str(e)}
 
 def update_record(model: str, id: int, values: dict) -> Dict[str, Any]:
     """Update an existing record in Odoo"""
     try:
         client = get_odoo_client()
-        success = client.write(model, [id], values)
+        params = UpdateParams(id=id, values=values)
+        success = client.write(model, params)
         return {
             "success": success,
             "model": model,
@@ -151,13 +160,15 @@ def update_record(model: str, id: int, values: dict) -> Dict[str, Any]:
             "message": f"Record {id} updated successfully" if success else "Update failed"
         }
     except Exception as e:
+        logger.error(f"Error in update_record: {str(e)}")
         return {"success": False, "error": str(e)}
 
 def delete_record(model: str, id: int) -> Dict[str, Any]:
     """Delete a record from Odoo"""
     try:
         client = get_odoo_client()
-        success = client.unlink(model, [id])
+        params = DeleteParams(id=id)
+        success = client.unlink(model, params)
         return {
             "success": success,
             "model": model,
@@ -165,6 +176,7 @@ def delete_record(model: str, id: int) -> Dict[str, Any]:
             "message": f"Record {id} deleted successfully" if success else "Delete failed"
         }
     except Exception as e:
+        logger.error(f"Error in delete_record: {str(e)}")
         return {"success": False, "error": str(e)}
 
 def execute_method(model: str, method: str, args: list = None, kwargs: dict = None) -> Dict[str, Any]:
@@ -179,6 +191,7 @@ def execute_method(model: str, method: str, args: list = None, kwargs: dict = No
             "result": result
         }
     except Exception as e:
+        logger.error(f"Error in execute_method: {str(e)}")
         return {"success": False, "error": str(e)}
 
 def get_model_fields(model: str) -> Dict[str, Any]:
@@ -192,6 +205,7 @@ def get_model_fields(model: str) -> Dict[str, Any]:
             "fields": fields
         }
     except Exception as e:
+        logger.error(f"Error in get_model_fields: {str(e)}")
         return {"success": False, "error": str(e)}
 
 def search_count(model: str, domain: list = None) -> Dict[str, Any]:
@@ -205,6 +219,7 @@ def search_count(model: str, domain: list = None) -> Dict[str, Any]:
             "count": count
         }
     except Exception as e:
+        logger.error(f"Error in search_count: {str(e)}")
         return {"success": False, "error": str(e)}
 
 def get_record_template(model: str) -> Dict[str, Any]:
@@ -222,6 +237,7 @@ def get_record_template(model: str) -> Dict[str, Any]:
             "template": template
         }
     except Exception as e:
+        logger.error(f"Error in get_record_template: {str(e)}")
         return {"success": False, "error": str(e)}
 
 def validate_field_value(model: str, field: str, value: Any) -> Dict[str, Any]:
@@ -233,7 +249,6 @@ def validate_field_value(model: str, field: str, value: Any) -> Dict[str, Any]:
             return {"success": False, "error": f"Field '{field}' not found in model '{model}'"}
         
         field_info = fields[field]
-        field_type = field_info.get('type')
         
         # Basic validation
         if field_info.get('required') and value is None:
@@ -247,6 +262,7 @@ def validate_field_value(model: str, field: str, value: Any) -> Dict[str, Any]:
             "valid": True
         }
     except Exception as e:
+        logger.error(f"Error in validate_field_value: {str(e)}")
         return {"success": False, "error": str(e)}
 
 # ============================================================================
