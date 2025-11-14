@@ -426,7 +426,8 @@ def export_related_records_to_csv(parent_model: str, child_model: str,
         client = get_odoo_client()
         
         # Get parent records
-        parent_records = client.search_read(parent_model, parent_domain or [], [], limit=1000, offset=0)
+        params = SearchParams(domain=parent_domain or [], limit=1000, offset=0)
+        parent_records = client.search_read(parent_model, params, None)
         
         if not parent_records:
             return {"success": False, "error": "No parent records found"}
@@ -438,7 +439,8 @@ def export_related_records_to_csv(parent_model: str, child_model: str,
             
             # Get child records
             child_domain = [(relation_field, '=', parent_id)]
-            child_records = client.search_read(child_model, child_domain, [], limit=10000, offset=0)
+            child_params = SearchParams(domain=child_domain, limit=10000, offset=0)
+            child_records = client.search_read(child_model, child_params, None)
             
             for child in child_records:
                 # Combine parent and child data
