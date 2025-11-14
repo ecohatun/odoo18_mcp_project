@@ -48,7 +48,7 @@ app.add_middleware(
 # Import Odoo client and tools
 try:
     from src.odoo.client import OdooClient
-    from src.odoo.schemas import OdooConfig
+    from src.odoo.schemas import OdooConfig, SearchParams, CreateParams, UpdateParams, DeleteParams
     logger.info("Successfully imported OdooClient")
     
     def get_odoo_client():
