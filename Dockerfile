@@ -57,24 +57,28 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app
 ENV GIT_PYTHON_REFRESH=quiet
 
-# Create a non-root user to run the application
-RUN groupadd -r mcp && useradd -r -g mcp mcp
-
-# Create directories for logs, data, and generated modules
+# Create directories FIRST (as root)
 RUN mkdir -p /app/logs /app/data /app/exports /app/tmp /app/generated_modules
 
-# Change ownership of ALL /app directory and subdirectories
+# Create a non-root user
+RUN groupadd -r mcp && useradd -r -g mcp mcp
+
+# Change ownership (still as root)
 RUN chown -R mcp:mcp /app
 
+# Set entrypoint script permissions (as root)
+RUN chmod +x /app/entrypoint.sh
+
+# NOW switch to non-root user
 USER mcp
+
 # Expose the port the app runs on
 EXPOSE 8001
-# Set entrypoint script permissions
-USER root
-RUN chmod +x /app/entrypoint.sh
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
+
 # Command to run the application
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["standalone"]
