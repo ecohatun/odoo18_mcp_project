@@ -70,8 +70,8 @@ try:
     from src.odoo.dynamic.model_discovery import ModelDiscovery
     
     def get_advanced_search():
-    odoo_client = get_odoo_client()
-    model_discovery = ModelDiscovery(odoo_client)
+        odoo_client = get_odoo_client()
+        model_discovery = ModelDiscovery(odoo_client)
         return AdvancedSearch(model_discovery)
     
     logger.info("Successfully imported AdvancedSearch")
