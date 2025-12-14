@@ -70,7 +70,9 @@ try:
     from src.odoo.dynamic.model_discovery import ModelDiscovery
     
     def get_advanced_search():
-        model_discovery = ModelDiscovery(
+        from src.odoo.client import OdooClient
+    
+        odoo_client = OdooClient(
             url=os.getenv("ODOO_URL"),
             db=os.getenv("ODOO_DB"),
             username=os.getenv("ODOO_USERNAME"),
