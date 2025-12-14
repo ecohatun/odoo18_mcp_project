@@ -63,16 +63,14 @@ try:
 except Exception as e:
     logger.error(f"Failed to import OdooClient: {e}")
     get_odoo_client = None
-
+  
 # Import advanced search
 try:
     from advanced_search import AdvancedSearch
     from src.odoo.dynamic.model_discovery import ModelDiscovery
     
     def get_advanced_search():
-        from src.odoo.client import OdooClient
-    
-        odoo_client = OdooClient(
+        model_discovery = ModelDiscovery(
             url=os.getenv("ODOO_URL"),
             db=os.getenv("ODOO_DB"),
             username=os.getenv("ODOO_USERNAME"),
