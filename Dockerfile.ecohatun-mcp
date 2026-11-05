@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+
+RUN python -m pip install --no-cache-dir mcp==1.26.0
+# Use the original RPC client without importing the legacy dynamic tooling.
+COPY src/odoo/client.py src/odoo/schemas.py /app/src/odoo/
+COPY ecohatun_mcp.py /app/ecohatun_mcp.py
+
+RUN python -c "from src.odoo.client import OdooClient; from ecohatun_mcp import create_app"
+USER 10001:10001
+EXPOSE 8000
+CMD ["python", "-m", "uvicorn", "ecohatun_mcp:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
